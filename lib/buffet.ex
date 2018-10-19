@@ -1,6 +1,6 @@
 defmodule Buffet do
   def define(protobuf) do
-    with {:ok, definitions} <- Buffet.Decoder.decode(protobuf) do
+    with {:ok, definitions} <- Buffet.Parser.parse(protobuf) do
       for {def, options} <- definitions, def == :message do
         message_name = Keyword.fetch!(options, :name)
 
