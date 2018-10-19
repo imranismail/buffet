@@ -15,12 +15,6 @@ defmodule Buffet do
 
         contents = quote bind_quoted: [fields: fields] do
           defstruct Keyword.keys(fields)
-
-          for {name, type} <- fields do
-            def put(struct, unquote(name), value) do
-              Map.put(struct, unquote(name), value)
-            end
-          end
         end
 
         Module.create(module_name, contents, Macro.Env.location(__ENV__))
