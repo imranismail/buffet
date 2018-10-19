@@ -19,7 +19,7 @@ defmodule BuffetTest do
   test "define/1" do
     foo = %Foo{}
     bar = %Bar{}
-    require IEx; IEx.pry()
+
     IO.inspect(foo)
     IO.inspect(bar)
   end
