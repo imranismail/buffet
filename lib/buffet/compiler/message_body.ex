@@ -22,8 +22,11 @@ defmodule Buffet.Compiler.MessageBody do
       end)
 
     quote bind_quoted: [fields: fields] do
-      @fields fields
-      defstruct Keyword.keys(@fields)
+      @buffet_fields fields
+
+      defstruct Keyword.keys(@buffet_fields)
+
+      def __meta__(:buffet_fields), do: @buffet_fields
     end
   end
 end
