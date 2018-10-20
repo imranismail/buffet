@@ -4,23 +4,28 @@ defmodule BuffetTest do
 
   doctest Buffet
 
-  Buffet.define("""
+  Buffet.define """
     syntax = "proto3";
 
     message Foo {
-      int32 foo = 1;
+      int32 bar = 1;
     }
 
     message Bar {
-      int32 foo = 1;
+      int32 baz = 1;
     }
-  """)
+  """
 
   test "define/1" do
     foo = %Foo{}
     bar = %Bar{}
 
-    IO.inspect(foo)
-    IO.inspect(bar)
+    assert foo.bar == nil
+    assert bar.baz == nil
+  end
+
+  test "encode/1" do
+    foo = %Foo{}
+    assert {:ok, _binary} = Buffet.encode(foo)
   end
 end

@@ -1,4 +1,4 @@
-defmodule Buffet.Helpers do
+defmodule Buffet.Parser.Helpers do
   import NimbleParsec
 
   def whitespace(combinator \\ empty()) do
@@ -6,5 +6,9 @@ defmodule Buffet.Helpers do
       combinator,
       ignore(utf8_string([?\s, ?\r, ?\n, ?\t, ?\f, ?\v], min: 1))
     )
+  end
+
+  def atom(combinator \\ empty(), content) do
+    map(combinator, string(content), {String, :to_atom, []})
   end
 end

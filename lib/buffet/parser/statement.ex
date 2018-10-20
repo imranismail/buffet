@@ -1,7 +1,7 @@
-defmodule Buffet.Statement do
+defmodule Buffet.Parser.Statement do
   import NimbleParsec
-  import Buffet.LexicalElements
-  import Buffet.Helpers
+  import Buffet.Parser.LexicalElements
+  import Buffet.Parser.Helpers
 
   # Syntax
 
@@ -12,7 +12,7 @@ defmodule Buffet.Statement do
     |> ignore(utf8_string([?=], 1))
     |> whitespace()
     |> quote_symbol()
-    |> string("proto3")
+    |> atom("proto3")
     |> quote_symbol()
     |> whitespace()
     |> end_of_statement()
@@ -66,17 +66,23 @@ defmodule Buffet.Statement do
   end
 
   def option_name(combinator \\ empty()) do
-    reduce(
-      combinator,
-      choice([
-        ident(),
-        utf8_string([?(], 1)
-        |> full_ident()
-        |> utf8_string([?)], 1)
-      ])
-      |> repeat(utf8_string([?.], 1) |> ident()),
-      {List, :to_string, []}
-    )
+    full_ident_option_name =
+      utf8_string([?(], 1)
+      |> full_ident()
+      |> utf8_string([?)], 1)
+
+    sub_ident_name =
+      [?.]
+      |> utf8_string(1)
+      |> ident()
+
+    to_concat =
+      [ident(), full_ident_option_name]
+      |> choice()
+      |> repeat(sub_ident_name)
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
   end
 
   # Fields
@@ -84,6 +90,13 @@ defmodule Buffet.Statement do
   ## Normal Field
 
   def field_def(combinator \\ empty()) do
+    options =
+      utf8_string([?[], 1)
+      |> whitespace()
+      |> field_options()
+      |> whitespace()
+      |> utf8_string([?]], 1)
+
     combinator
     |> map(optional(string("repeated")), {Kernel, :==, ["repeated"]})
     |> whitespace()
@@ -93,15 +106,9 @@ defmodule Buffet.Statement do
     |> whitespace()
     |> ignore(utf8_string([?=], 1))
     |> whitespace()
-    |> field_number()
+    |> map(field_number(), {String, :to_integer, []})
     |> whitespace()
-    |> optional(
-      utf8_string([?[], 1)
-      |> whitespace()
-      |> field_options()
-      |> whitespace()
-      |> utf8_string([?]], 1)
-    )
+    |> optional(options)
     |> whitespace()
     |> end_of_statement()
     |> tag(:field)
@@ -109,20 +116,20 @@ defmodule Buffet.Statement do
 
   def type(combinator \\ empty()) do
     choice(combinator, [
-      string("double"),
-      string("float"),
-      string("int32"),
-      string("int64"),
-      string("uint32"),
-      string("uint64"),
-      string("sint32"),
-      string("sint64"),
-      string("fixed32"),
-      string("fixed64"),
-      string("sfixed32"),
-      string("sfixed64"),
-      string("bool"),
-      string("string"),
+      atom("double"),
+      atom("float"),
+      atom("int32"),
+      atom("int64"),
+      atom("uint32"),
+      atom("uint64"),
+      atom("sint32"),
+      atom("sint64"),
+      atom("fixed32"),
+      atom("fixed64"),
+      atom("sfixed32"),
+      atom("sfixed64"),
+      atom("bool"),
+      atom("string"),
       message_type(),
       enum_type()
     ])
@@ -215,13 +222,15 @@ defmodule Buffet.Statement do
   end
 
   def message_body(combinator \\ empty()) do
+    body_def_choice =
+      [field_def(), option_def(), one_of_def(), empty_statement()]
+      |> choice()
+      |> whitespace()
+
     combinator
     |> ignore(utf8_string([?{], 1))
     |> whitespace()
-    |> repeat_until(
-      choice([field_def(), option_def(), one_of_def(), end_of_statement()]) |> whitespace(),
-      [utf8_string([?}], 1)]
-    )
+    |> repeat_until(body_def_choice, [utf8_string([?}], 1)])
     |> whitespace()
     |> ignore(utf8_string([?}], 1))
   end
@@ -229,19 +238,15 @@ defmodule Buffet.Statement do
   # Proto file
 
   def proto_def(combinator \\ empty()) do
+    proto_def_choice =
+      [import_def(), package_def(), option_def(), top_level_def(), empty_statement()]
+      |> choice()
+      |> whitespace()
+
     combinator
     |> whitespace()
     |> syntax_def()
     |> whitespace()
-    |> repeat(
-      choice([
-        import_def(),
-        package_def(),
-        option_def(),
-        top_level_def(),
-        end_of_statement()
-      ])
-      |> whitespace()
-    )
+    |> repeat(proto_def_choice)
   end
 end

@@ -1,4 +1,4 @@
-defmodule Buffet.LexicalElements do
+defmodule Buffet.Parser.LexicalElements do
   import NimbleParsec
 
   # Letters and Digits
@@ -49,30 +49,41 @@ defmodule Buffet.LexicalElements do
   # Identifiers
 
   def ident(combinator \\ empty()) do
-    reduce(
-      combinator,
+    choice_after_first_letter =
+      choice([
+        letter(),
+        decimal_digit(),
+        utf8_string([?_], 1)
+      ])
+
+    to_concat =
       letter()
-      |> repeat(
-        choice([
-          letter(),
-          decimal_digit(),
-          utf8_string([?_], 1)
-        ])
-      ),
-      {List, :to_string, []}
-    )
+      |> repeat(choice_after_first_letter)
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
   end
 
   def full_ident(combinator \\ empty()) do
-    reduce(
-      combinator,
-      ident() |> repeat(ident(utf8_string([?.], 1))),
-      {List, :to_string, []}
-    )
+    sub_ident =
+      ident()
+      |> utf8_string([?.], 1)
+
+    to_concat =
+      ident()
+      |> repeat(sub_ident)
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
   end
 
   def message_name(combinator \\ empty()) do
-    ident(combinator)
+    to_concat =
+      ident()
+      |> map({List, :wrap, []})
+      |> map({Module, :concat, []})
+
+    concat(combinator, to_concat)
   end
 
   def enum_name(combinator \\ empty()) do
@@ -80,7 +91,7 @@ defmodule Buffet.LexicalElements do
   end
 
   def field_name(combinator \\ empty()) do
-    ident(combinator)
+    map(combinator, ident(), {String, :to_atom, []})
   end
 
   def one_of_name(combinator \\ empty()) do
@@ -100,23 +111,23 @@ defmodule Buffet.LexicalElements do
   end
 
   def message_type(combinator \\ empty()) do
-    reduce(
-      combinator,
+    to_concat =
       optional(utf8_string([?.], 1))
       |> repeat(utf8_string(ident(), [?.], 1))
-      |> message_name(),
-      {List, :to_string, []}
-    )
+      |> message_name()
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
   end
 
   def enum_type(combinator \\ empty()) do
-    reduce(
-      combinator,
+    to_concat =
       optional(utf8_string([?.], 1))
       |> repeat(utf8_string(ident(), [?.], 1))
-      |> enum_name(),
-      {List, :to_string, []}
-    )
+      |> enum_name()
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
   end
 
   # Integer Literals
@@ -148,17 +159,26 @@ defmodule Buffet.LexicalElements do
   # Floating-point literals
 
   def float_lit(combinator \\ empty()) do
+    two_decimal_places_with_exponent =
+      decimals()
+      |> utf8_string([?.], 1)
+      |> optional(decimals())
+      |> optional(exponent())
+
+    decimal_with_exponent =
+      decimals()
+      |> exponent()
+
+    one_decimal_place_with_exponent =
+      utf8_string([?.], 1)
+      |> decimals()
+      |> optional(exponent())
+
     choice(combinator, [
       choice([
-        decimals()
-        |> utf8_string([?.], 1)
-        |> optional(decimals())
-        |> optional(exponent()),
-        decimals()
-        |> exponent(),
-        utf8_string([?.], 1)
-        |> decimals()
-        |> optional(exponent())
+        two_decimal_places_with_exponent,
+        decimal_with_exponent,
+        one_decimal_place_with_exponent
       ]),
       string("inf"),
       string("nan")
@@ -190,18 +210,22 @@ defmodule Buffet.LexicalElements do
   # String literals
 
   def str_lit(combinator \\ empty()) do
-    reduce(
-      combinator,
-      choice([
-        ignore(utf8_string([?'], 1))
-        |> repeat_until(char_value(), [utf8_string([?'], 1)])
-        |> ignore(utf8_string([?'], 1)),
-        ignore(utf8_string([?"], 1))
-        |> repeat_until(char_value(), [utf8_string([?"], 1)])
-        |> ignore(utf8_string([?"], 1))
-      ]),
-      {List, :to_string, []}
-    )
+    single_quoted_string =
+      ignore(utf8_string([?'], 1))
+      |> repeat_until(char_value(), [utf8_string([?'], 1)])
+      |> ignore(utf8_string([?'], 1))
+
+    double_quoted_string =
+      ignore(utf8_string([?"], 1))
+      |> repeat_until(char_value(), [utf8_string([?"], 1)])
+      |> ignore(utf8_string([?"], 1))
+
+    to_concat =
+      [single_quoted_string, double_quoted_string]
+      |> choice()
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
   end
 
   def char_value(combinator \\ empty()) do
