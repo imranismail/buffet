@@ -1,5 +1,6 @@
 defmodule Buffet.Parser.LexicalElements do
   import NimbleParsec
+  import Buffet.Parser.Helpers
 
   # Letters and Digits
 
@@ -78,12 +79,7 @@ defmodule Buffet.Parser.LexicalElements do
   end
 
   def message_name(combinator \\ empty()) do
-    to_concat =
-      ident()
-      |> map({List, :wrap, []})
-      |> map({Module, :concat, []})
-
-    concat(combinator, to_concat)
+    ident(combinator)
   end
 
   def enum_name(combinator \\ empty()) do
@@ -94,7 +90,19 @@ defmodule Buffet.Parser.LexicalElements do
     map(combinator, ident(), {String, :to_atom, []})
   end
 
-  def one_of_name(combinator \\ empty()) do
+  def field_names(combinator \\ empty()) do
+    repeat_field_name =
+      utf8_string([?,], 1)
+      |> whitespace()
+      |> field_name()
+
+    combinator
+    |> field_name()
+    |> whitespace()
+    |> repeat_until(repeat_field_name, [utf8_string([?;], 1)])
+  end
+
+  def oneof_name(combinator \\ empty()) do
     ident(combinator)
   end
 
@@ -110,12 +118,33 @@ defmodule Buffet.Parser.LexicalElements do
     ident(combinator)
   end
 
+  def option_name(combinator \\ empty()) do
+    full_ident_option_name =
+      utf8_string([?(], 1)
+      |> full_ident()
+      |> utf8_string([?)], 1)
+
+    sub_ident_name =
+      [?.]
+      |> utf8_string(1)
+      |> ident()
+
+    to_concat =
+      [ident(), full_ident_option_name]
+      |> choice()
+      |> repeat(sub_ident_name)
+      |> reduce({List, :to_string, []})
+
+    concat(combinator, to_concat)
+  end
+
   def message_type(combinator \\ empty()) do
     to_concat =
       optional(utf8_string([?.], 1))
       |> repeat(utf8_string(ident(), [?.], 1))
       |> message_name()
       |> reduce({List, :to_string, []})
+      |> to_module()
 
     concat(combinator, to_concat)
   end
@@ -126,8 +155,47 @@ defmodule Buffet.Parser.LexicalElements do
       |> repeat(utf8_string(ident(), [?.], 1))
       |> enum_name()
       |> reduce({List, :to_string, []})
+      |> to_module()
 
     concat(combinator, to_concat)
+  end
+
+  def type(combinator \\ empty()) do
+    choice(combinator, [
+      to_atom(string("double")),
+      to_atom(string("float")),
+      to_atom(string("int32")),
+      to_atom(string("int64")),
+      to_atom(string("uint32")),
+      to_atom(string("uint64")),
+      to_atom(string("sint32")),
+      to_atom(string("sint64")),
+      to_atom(string("fixed32")),
+      to_atom(string("fixed64")),
+      to_atom(string("sfixed32")),
+      to_atom(string("sfixed64")),
+      to_atom(string("bool")),
+      to_atom(string("string")),
+      message_type(),
+      enum_type()
+    ])
+  end
+
+  def map_key_type(combinator \\ empty()) do
+    choice(combinator, [
+      to_atom(string("int32")),
+      to_atom(string("int64")),
+      to_atom(string("uint32")),
+      to_atom(string("uint64")),
+      to_atom(string("sint32")),
+      to_atom(string("sint64")),
+      to_atom(string("fixed32")),
+      to_atom(string("fixed64")),
+      to_atom(string("sfixed32")),
+      to_atom(string("sfixed64")),
+      to_atom(string("bool")),
+      to_atom(string("string")),
+    ])
   end
 
   # Integer Literals
@@ -201,10 +269,10 @@ defmodule Buffet.Parser.LexicalElements do
   # Boolean
 
   def bool_lit(combinator \\ empty()) do
-    choice(combinator, [
+    to_atom(combinator, choice([
       string("true"),
       string("false")
-    ])
+    ]))
   end
 
   # String literals
@@ -277,11 +345,142 @@ defmodule Buffet.Parser.LexicalElements do
 
   def constant(combinator \\ empty()) do
     choice(combinator, [
+      bool_lit(),
       full_ident(),
       int_lit(utf8_string([?-, ?+], 1)),
       float_lit(utf8_string([?-, ?+], 1)),
-      str_lit(),
-      bool_lit()
+      str_lit()
     ])
+  end
+
+  # Field Elements
+  def field_number(combinator \\ empty()) do
+    int_lit(combinator)
+  end
+
+  def field_option(combinator \\ empty()) do
+    to_concat =
+      to_atom(option_name())
+      |> whitespace()
+      |> ignore(utf8_string([?=], 1))
+      |> whitespace()
+      |> constant()
+      |> reduce({List, :to_tuple, []})
+
+    concat(combinator, to_concat)
+  end
+
+  def field_options(combinator \\ empty()) do
+    to_concat =
+      ignore(utf8_string([?[], 1))
+      |> field_option()
+      |> whitespace()
+      |> repeat_until(
+        ignore(utf8_string([?,], 1))
+        |> whitespace()
+        |> field_option(),
+        [utf8_string([?]], 1)]
+      )
+      |> ignore(utf8_string([?]], 1))
+      |> reduce({List, :wrap, []})
+
+    concat(combinator, to_concat)
+  end
+
+  # Oneof Elements
+
+  def oneof_field(combinator \\ empty()) do
+    combinator
+    |> type()
+    |> whitespace()
+    |> field_name()
+    |> whitespace()
+    |> utf8_string([?=], 1)
+    |> whitespace()
+    |> field_number()
+    |> whitespace()
+    |> optional(field_options())
+    |> whitespace()
+    |> end_of_statement()
+  end
+
+  # Misc
+
+  def range(combinator \\ empty()) do
+    combinator
+    |> int_lit()
+    |> optional(choice(string("to"), [int_lit(), string("max")]))
+  end
+
+  def ranges(combinator \\ empty()) do
+    repeat_range =
+      utf8_string([?,], 1)
+      |> whitespace()
+      |> range()
+
+    combinator
+    |> range()
+    |> whitespace()
+    |> repeat_until(repeat_range, [utf8_string([?;], 1)])
+  end
+
+  def enum_body(combinator \\ empty()) do
+    body_def_choice =
+      [option_def(), enum_field(), empty_statement()]
+      |> choice()
+      |> whitespace()
+
+    combinator
+    |> ignore(utf8_string([?{], 1))
+    |> whitespace()
+    |> repeat_until(body_def_choice, [utf8_string([?}], 1)])
+    |> whitespace()
+    |> ignore(utf8_string([?}], 1))
+    |> tag(:body)
+  end
+
+  def enum_field(combinator \\ empty()) do
+    repeat_enum_value_option =
+      utf8_string([?,], 1)
+      |> enum_value_option()
+      |> whitespace()
+
+    options =
+      utf8_string([?[], 1)
+      |> ignore()
+      |> enum_value_option()
+      |> repeat_until(repeat_enum_value_option, [utf8_string([?]], 1)])
+      |> ignore(utf8_string([?]], 1))
+
+    combinator
+    |> ident()
+    |> whitespace()
+    |> ignore(utf8_string([?=], 1))
+    |> whitespace()
+    |> int_lit()
+    |> optional(options)
+    |> end_of_statement()
+  end
+
+  def enum_value_option(combinator \\ empty()) do
+    combinator
+    |> option_name()
+    |> whitespace()
+    |> ignore(utf8_string([?=], 1))
+    |> whitespace()
+    |> constant()
+  end
+
+  def option_def(combinator \\ empty()) do
+    combinator
+    |> ignore(string("option"))
+    |> whitespace()
+    |> option_name()
+    |> whitespace()
+    |> ignore(utf8_string([?=], 1))
+    |> whitespace()
+    |> constant()
+    |> end_of_statement()
+    |> tag(:option)
   end
 end
