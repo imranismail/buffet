@@ -47,6 +47,7 @@ defmodule Buffet.Statement do
     |> full_ident()
     |> whitespace()
     |> end_of_statement()
+    |> tag(:package)
   end
 
   # Option
