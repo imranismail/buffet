@@ -10,7 +10,7 @@ defmodule BuffetTest do
     message Outer {
       int64 oval = 1;
 
-      foo.bar nested_message = 2;
+      Foo.Bar nested_message = 2;
 
       repeated int32 samples = 4 [packed=true];
 
