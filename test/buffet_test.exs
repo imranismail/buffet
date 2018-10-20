@@ -1,10 +1,10 @@
 defmodule BuffetTest do
   use ExUnit.Case
-  require Buffet
+  import Buffet
 
   doctest Buffet
 
-  Buffet.define """
+  defproto """
     syntax = "proto3";
 
     message Outer {
@@ -17,7 +17,9 @@ defmodule BuffetTest do
   """
 
   test "define/1" do
-    assert outer = %BuffetTest.Outer{}
-    assert inner = %BuffetTest.Outer.Inner{}
+    assert outer = %BuffetTest.Outer{oval: 1}
+    assert inner = %BuffetTest.Outer.Inner{ival: 2}
+    assert outer.oval == 1
+    assert inner.ival == 2
   end
 end

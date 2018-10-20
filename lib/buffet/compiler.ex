@@ -10,5 +10,8 @@ defmodule Buffet.Compiler do
 
   defp compile(:syntax, children), do: Syntax.compile(children)
   defp compile(:message, children), do: Message.compile(children)
-  defp compile(:enum, children), do: :not_implemented
+  defp compile(:enum, _children), do: {:error, :not_implemented}
+  defp compile(:import, _children), do: {:error, :not_implemented}
+  defp compile(:package, _children), do: {:error, :not_implemented}
+  defp compile(:service, _children), do: {:error, :not_implemented}
 end

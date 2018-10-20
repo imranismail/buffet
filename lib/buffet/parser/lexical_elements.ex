@@ -352,6 +352,7 @@ defmodule Buffet.Parser.LexicalElements do
   end
 
   # Field Elements
+
   def field_number(combinator \\ empty()) do
     int_lit(combinator)
   end
