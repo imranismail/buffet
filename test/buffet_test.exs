@@ -7,6 +7,16 @@ defmodule BuffetTest do
   Buffet.define """
     syntax = "proto3";
 
+    enum EnumAllowingAlias {
+      option allow_alias = true;
+
+      UNKNOWN = 0;
+
+      STARTED = 1;
+
+      RUNNING = 2 [(custom_option) = "hello world"];
+    }
+
     message Outer {
       int64 oval = 1;
 
@@ -21,6 +31,6 @@ defmodule BuffetTest do
   """
 
   test "define/1" do
-    assert outer = %Outer{}
+    # assert outer = %Outer{}
   end
 end

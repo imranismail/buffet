@@ -201,7 +201,7 @@ defmodule Buffet.Parser.LexicalElements do
   # Integer Literals
 
   def int_lit(combinator \\ empty()) do
-    choice(combinator, [decimal_lit(), octal_lit(), hex_lit()])
+    to_integer(combinator, choice([decimal_lit(), octal_lit(), hex_lit()]))
   end
 
   def decimal_lit(combinator \\ empty()) do
@@ -425,50 +425,59 @@ defmodule Buffet.Parser.LexicalElements do
   end
 
   def enum_body(combinator \\ empty()) do
-    body_def_choice =
-      [option_def(), enum_field(), empty_statement()]
-      |> choice()
+    to_concat =
+      ignore(utf8_string([?{], 1))
       |> whitespace()
+      |> repeat_until(whitespace(choice([option_def(), enum_field(), empty_statement()])), [utf8_string([?}], 1)])
+      |> whitespace()
+      |> ignore(utf8_string([?}], 1))
+      |> tag(:body)
 
-    combinator
-    |> ignore(utf8_string([?{], 1))
-    |> whitespace()
-    |> repeat_until(body_def_choice, [utf8_string([?}], 1)])
-    |> whitespace()
-    |> ignore(utf8_string([?}], 1))
-    |> tag(:body)
+    concat(combinator, to_concat)
   end
 
   def enum_field(combinator \\ empty()) do
     repeat_enum_value_option =
-      utf8_string([?,], 1)
+      ignore(utf8_string([?,], 1))
       |> enum_value_option()
       |> whitespace()
 
     options =
       utf8_string([?[], 1)
       |> ignore()
+      |> whitespace()
       |> enum_value_option()
+      |> whitespace()
       |> repeat_until(repeat_enum_value_option, [utf8_string([?]], 1)])
+      |> whitespace()
       |> ignore(utf8_string([?]], 1))
+      |> reduce({List, :wrap, []})
 
-    combinator
-    |> ident()
-    |> whitespace()
-    |> ignore(utf8_string([?=], 1))
-    |> whitespace()
-    |> int_lit()
-    |> optional(options)
-    |> end_of_statement()
+    to_concat =
+      to_atom(ident())
+      |> whitespace()
+      |> to_atom(utf8_string([?=], 1))
+      |> whitespace()
+      |> int_lit()
+      |> whitespace()
+      |> optional(options)
+      |> whitespace()
+      |> end_of_statement()
+      |> tag(:field)
+
+    concat(combinator, to_concat)
   end
 
   def enum_value_option(combinator \\ empty()) do
-    combinator
-    |> option_name()
-    |> whitespace()
-    |> ignore(utf8_string([?=], 1))
-    |> whitespace()
-    |> constant()
+    to_concat =
+      to_atom(option_name())
+      |> whitespace()
+      |> ignore(utf8_string([?=], 1))
+      |> whitespace()
+      |> constant()
+      |> reduce({List, :to_tuple, []})
+
+    concat(combinator, to_concat)
   end
 
   def option_def(combinator \\ empty()) do

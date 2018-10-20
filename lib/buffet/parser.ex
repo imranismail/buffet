@@ -81,7 +81,7 @@ defmodule Buffet.Parser do
     |> whitespace()
     |> to_atom(utf8_string([?=], 1))
     |> whitespace()
-    |> to_integer(field_number())
+    |> field_number()
     |> whitespace()
     |> optional(field_options())
     |> whitespace()
