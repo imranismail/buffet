@@ -60,7 +60,7 @@ defmodule Buffet.Parser.LexicalElements do
     to_concat =
       letter()
       |> repeat(choice_after_first_letter)
-      |> reduce({List, :to_string, []})
+      |> list_to_string()
 
     concat(combinator, to_concat)
   end
@@ -73,21 +73,21 @@ defmodule Buffet.Parser.LexicalElements do
     to_concat =
       ident()
       |> repeat(sub_ident)
-      |> reduce({List, :to_string, []})
+      |> list_to_string()
 
     concat(combinator, to_concat)
   end
 
   def message_name(combinator \\ empty()) do
-    ident(combinator)
+    camelize(combinator, ident())
   end
 
   def enum_name(combinator \\ empty()) do
-    ident(combinator)
+    camelize(combinator, ident())
   end
 
   def field_name(combinator \\ empty()) do
-    map(combinator, ident(), {String, :to_atom, []})
+    to_atom(combinator, ident())
   end
 
   def field_names(combinator \\ empty()) do
@@ -133,7 +133,7 @@ defmodule Buffet.Parser.LexicalElements do
       [ident(), full_ident_option_name]
       |> choice()
       |> repeat(sub_ident_name)
-      |> reduce({List, :to_string, []})
+      |> list_to_string()
 
     concat(combinator, to_concat)
   end
@@ -143,8 +143,7 @@ defmodule Buffet.Parser.LexicalElements do
       optional(utf8_string([?.], 1))
       |> repeat(utf8_string(ident(), [?.], 1))
       |> message_name()
-      |> reduce({List, :to_string, []})
-      |> to_module()
+      |> list_to_string()
 
     concat(combinator, to_concat)
   end
@@ -154,8 +153,7 @@ defmodule Buffet.Parser.LexicalElements do
       optional(utf8_string([?.], 1))
       |> repeat(utf8_string(ident(), [?.], 1))
       |> enum_name()
-      |> reduce({List, :to_string, []})
-      |> to_module()
+      |> list_to_string()
 
     concat(combinator, to_concat)
   end
@@ -291,7 +289,7 @@ defmodule Buffet.Parser.LexicalElements do
     to_concat =
       [single_quoted_string, double_quoted_string]
       |> choice()
-      |> reduce({List, :to_string, []})
+      |> list_to_string()
 
     concat(combinator, to_concat)
   end

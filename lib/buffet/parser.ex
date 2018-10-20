@@ -137,7 +137,7 @@ defmodule Buffet.Parser do
   defcombinatorp :enum,
     ignore(string("enum"))
     |> whitespace()
-    |> unwrap_and_tag(to_module(enum_name()), :name)
+    |> unwrap_and_tag(enum_name(), :name)
     |> whitespace()
     |> enum_body()
     |> tag(:enum)
@@ -145,7 +145,7 @@ defmodule Buffet.Parser do
   defcombinatorp :message,
     ignore(string("message"))
     |> whitespace()
-    |> unwrap_and_tag(to_module(message_name()), :name)
+    |> unwrap_and_tag(message_name(), :name)
     |> whitespace()
     |> parsec(:message_body)
     |> tag(:message)

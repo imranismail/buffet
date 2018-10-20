@@ -16,12 +16,11 @@ defmodule Buffet.Parser.Helpers do
     map(combinator, to_integer, {String, :to_integer, []})
   end
 
-  def to_module(combinator \\ empty(), to_mod) do
-    to_concat =
-      to_mod
-      |> map({List, :wrap, []})
-      |> map({Module, :concat, []})
+  def list_to_string(combinator \\ empty(), list) do
+    reduce(combinator, list, {List, :to_string, []})
+  end
 
-    concat(combinator, to_concat)
+  def camelize(combinator \\ empty(), to_camelize) do
+    map(combinator, to_camelize, {Macro, :camelize, []})
   end
 end

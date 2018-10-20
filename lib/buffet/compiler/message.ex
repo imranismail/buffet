@@ -3,12 +3,12 @@ defmodule Buffet.Compiler.Message do
 
   def compile(children) do
     message_name = Keyword.fetch!(children, :name)
+    message_body = Keyword.fetch!(children, :body)
 
-    message_body =
-      children
-      |> Keyword.fetch!(:body)
-      |> MessageBody.compile()
-
-    Module.create(message_name, message_body, Macro.Env.location(__ENV__))
+    quote do
+      defmodule Module.concat(__MODULE__, unquote message_name) do
+        unquote MessageBody.compile(message_body)
+      end
+    end
   end
 end
